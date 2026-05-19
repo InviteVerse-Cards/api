@@ -26,19 +26,22 @@ export const PublicController = {
   async getTemplateDemo(req: Request, res: Response, next: NextFunction) {
     try {
       const { slug } = req.params
-      const template = await TemplateModel.findBySlug(slug)
-      if (!template) {
+      const full = await TemplateModel.findBySlugFull(slug)
+      if (!full) {
         return next(new AppError('NOT_FOUND', 'Mẫu thiệp không tồn tại', 404))
       }
-      const defaultConfig = TemplateModel.parseDefaultConfig(template)
       return res.json(success({
-        id: template.id,
-        slug: template.slug,
-        name: template.name,
-        description: template.description,
-        thumbnail_url: template.thumbnail_url,
-        plan_required: template.plan_required,
-        default_config: defaultConfig,
+        id: full.id,
+        uuid: full.uuid,
+        slug: full.slug,
+        name: full.name,
+        description: full.description,
+        thumbnail_url: full.thumbnail_url,
+        plan_required: full.plan_required,
+        category: full.category_slug,
+        theme_config: full.theme_config_parsed,
+        sections: full.sections,
+        default_music_track: full.default_music_track,
       }))
     } catch (err) { next(err) }
   },

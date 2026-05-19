@@ -15,7 +15,34 @@ export interface TemplateRow {
   use_count: number
   is_active: number
   default_config: string
+  theme_config: string | null
+  default_music_track_id: number | null
+  layout_type?: string | null
   created_at?: string
+}
+
+export interface TemplateSectionRow {
+  id: number
+  template_id: number
+  section_type: string
+  sort_order: number
+  is_enabled: boolean
+  config: Record<string, unknown>
+}
+
+export interface FullTemplateData extends TemplateRow {
+  theme_config_parsed: Record<string, unknown>
+  sections: TemplateSectionRow[]
+  default_music_track: { id: number; name: string; url: string } | null
+}
+
+interface TemplateSectionRowPacket extends RowDataPacket {
+  id: number
+  template_id: number
+  section_type: string
+  sort_order: number
+  is_enabled: number
+  config: string | Record<string, unknown>
 }
 
 export interface CreateTemplateDto {
@@ -170,5 +197,136 @@ export const TemplateModel = {
     } catch {
       return { theme: {}, sections: [] }
     }
+  },
+
+  async findByUuidFull(uuid: string): Promise<FullTemplateData | null> {
+    const [rows] = await pool.query<Array<TemplateRow & RowDataPacket>>(
+      `SELECT t.*, tc.slug as category_slug
+       FROM templates t
+       JOIN template_categories tc ON t.category_id = tc.id
+       WHERE t.uuid = ?`,
+      [uuid]
+    )
+    if (!rows[0]) return null
+    return TemplateModel._buildFullData(rows[0])
+  },
+
+  async findBySlugFull(slug: string): Promise<FullTemplateData | null> {
+    const [rows] = await pool.query<Array<TemplateRow & RowDataPacket>>(
+      `SELECT t.*, tc.slug as category_slug
+       FROM templates t
+       JOIN template_categories tc ON t.category_id = tc.id
+       WHERE t.slug = ? AND t.is_active = 1`,
+      [slug]
+    )
+    if (!rows[0]) return null
+    return TemplateModel._buildFullData(rows[0])
+  },
+
+  async _buildFullData(template: TemplateRow): Promise<FullTemplateData> {
+    // Fetch template_sections
+    const [sectionRows] = await pool.query<TemplateSectionRowPacket[]>(
+      `SELECT id, template_id, section_type, sort_order, is_enabled, config
+       FROM template_sections
+       WHERE template_id = ?
+       ORDER BY sort_order ASC`,
+      [template.id]
+    )
+
+    // Fetch default music track
+    let defaultMusicTrack: { id: number; name: string; url: string } | null = null
+    if (template.default_music_track_id) {
+      const [trackRows] = await pool.query<Array<{ id: number; name: string; url: string } & RowDataPacket>>(
+        'SELECT id, name, url FROM music_tracks WHERE id = ?',
+        [template.default_music_track_id]
+      )
+      defaultMusicTrack = trackRows[0] ?? null
+    }
+
+    const sections: TemplateSectionRow[] = sectionRows.map(s => ({
+      id: s.id,
+      template_id: s.template_id,
+      section_type: s.section_type,
+      sort_order: s.sort_order,
+      is_enabled: Boolean(s.is_enabled),
+      config: typeof s.config === 'string' ? JSON.parse(s.config) : (s.config as Record<string, unknown>),
+    }))
+
+    // Parse theme_config — prefer new column, fallback to default_config.theme
+    let themeConfigParsed: Record<string, unknown> = {}
+    if (template.theme_config) {
+      try {
+        themeConfigParsed = typeof template.theme_config === 'string'
+          ? JSON.parse(template.theme_config)
+          : (template.theme_config as Record<string, unknown>)
+      } catch {}
+    }
+    if (Object.keys(themeConfigParsed).length === 0) {
+      const parsed = TemplateModel.parseDefaultConfig(template)
+      themeConfigParsed = (parsed.theme as Record<string, unknown>) ?? {}
+    }
+
+    // If no template_sections yet, fall back to default_config sections
+    if (sections.length === 0) {
+      const parsed = TemplateModel.parseDefaultConfig(template)
+      const fallback = (parsed.sections as Array<Record<string, unknown>>) ?? []
+      return {
+        ...template,
+        theme_config_parsed: themeConfigParsed,
+        sections: fallback.map((s, idx) => ({
+          id: 0,
+          template_id: template.id,
+          section_type: s.section_type as string,
+          sort_order: typeof s.sort_order === 'number' ? s.sort_order : idx,
+          is_enabled: s.is_enabled !== false,
+          config: (s.config as Record<string, unknown>) ?? {},
+        })),
+        default_music_track: defaultMusicTrack,
+      }
+    }
+
+    return { ...template, theme_config_parsed: themeConfigParsed, sections, default_music_track: defaultMusicTrack }
+  },
+
+  async updateThemeConfig(uuid: string, theme: Record<string, unknown>): Promise<void> {
+    await pool.query(
+      'UPDATE templates SET theme_config = ?, updated_at = NOW() WHERE uuid = ?',
+      [JSON.stringify(theme), uuid]
+    )
+  },
+
+  async upsertSections(templateId: number, sections: Array<{
+    section_type: string
+    sort_order: number
+    is_enabled: boolean
+    config: Record<string, unknown>
+  }>): Promise<void> {
+    if (sections.length === 0) return
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+      await conn.query('DELETE FROM template_sections WHERE template_id = ?', [templateId])
+      const values = sections.map(s => [
+        templateId, s.section_type, s.sort_order, s.is_enabled ? 1 : 0, JSON.stringify(s.config),
+      ])
+      await conn.query(
+        `INSERT INTO template_sections (template_id, section_type, sort_order, is_enabled, config)
+         VALUES ?`,
+        [values]
+      )
+      await conn.commit()
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
+    }
+  },
+
+  async setDefaultMusic(uuid: string, trackId: number | null): Promise<void> {
+    await pool.query(
+      'UPDATE templates SET default_music_track_id = ?, updated_at = NOW() WHERE uuid = ?',
+      [trackId, uuid]
+    )
   },
 }
