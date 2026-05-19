@@ -40,17 +40,28 @@ export const InvitationService = {
       const template = await TemplateModel.findById(body.template_id)
       if (!template) throw new AppError('NOT_FOUND', 'Template không tồn tại', 404)
       templateId = template.id
-      const config = TemplateModel.parseDefaultConfig(template)
-      themeConfig = config.theme as Record<string, unknown>
-      defaultSections = (config.sections as typeof defaultSections) ?? []
 
-      // Inject layout_type into hero section so InvitationRenderer can derive it
-      if (config.layout_type) {
-        const heroIdx = defaultSections.findIndex(s => s.section_type === 'hero')
-        if (heroIdx !== -1) {
-          defaultSections[heroIdx] = {
-            ...defaultSections[heroIdx],
-            config: { ...defaultSections[heroIdx].config, layout_type: config.layout_type },
+      // Prefer new template_sections table; fallback to default_config for backward compat
+      const fullTemplate = await TemplateModel._buildFullData(template)
+      themeConfig = fullTemplate.theme_config_parsed
+      defaultSections = fullTemplate.sections.map(s => ({
+        section_type: s.section_type,
+        sort_order: s.sort_order,
+        is_enabled: s.is_enabled,
+        config: s.config,
+      }))
+
+      // Inject default music track into music section if present
+      if (fullTemplate.default_music_track) {
+        const musicIdx = defaultSections.findIndex(s => s.section_type === 'music')
+        if (musicIdx !== -1) {
+          defaultSections[musicIdx] = {
+            ...defaultSections[musicIdx],
+            config: {
+              ...defaultSections[musicIdx].config,
+              track_url: fullTemplate.default_music_track.url,
+              track_name: fullTemplate.default_music_track.name,
+            },
           }
         }
       }

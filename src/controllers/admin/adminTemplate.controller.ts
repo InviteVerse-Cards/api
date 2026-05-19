@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
-import { success } from "@/utils/response";
+import { success, AppError } from "@/utils/response";
 import { TemplateService } from "@/services/template.service";
+import { TemplateModel } from "@/models/template.model";
 
 export const AdminTemplateController = {
   list: async (_req: Request, res: Response, next: NextFunction) => {
@@ -72,6 +73,66 @@ export const AdminTemplateController = {
       const { uuid } = req.params;
       await TemplateService.remove(uuid);
       return res.json(success(null, "Đã xóa template"));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getFull: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { uuid } = req.params;
+      const data = await TemplateModel.findByUuidFull(uuid);
+      if (!data) return next(new AppError("NOT_FOUND", "Template không tồn tại", 404));
+      return res.json(success({
+        ...data,
+        category: data.category_slug,
+        theme_config: data.theme_config_parsed,
+        sections: data.sections,
+        default_music_track: data.default_music_track,
+      }));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  updateTheme: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { uuid } = req.params;
+      const { theme_config } = req.body;
+      if (!theme_config || typeof theme_config !== "object") {
+        return next(new AppError("VALIDATION_ERROR", "theme_config phải là object", 400));
+      }
+      await TemplateModel.updateThemeConfig(uuid, theme_config as Record<string, unknown>);
+      return res.json(success(null, "Đã cập nhật theme"));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  updateSections: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { uuid } = req.params;
+      const { sections } = req.body;
+      if (!Array.isArray(sections)) {
+        return next(new AppError("VALIDATION_ERROR", "sections phải là array", 400));
+      }
+      const template = await TemplateModel.findByUuid(uuid);
+      if (!template) return next(new AppError("NOT_FOUND", "Template không tồn tại", 404));
+      await TemplateModel.upsertSections(template.id, sections as Array<{
+        section_type: string; sort_order: number; is_enabled: boolean; config: Record<string, unknown>
+      }>);
+      return res.json(success(null, "Đã cập nhật sections"));
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  updateMusic: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { uuid } = req.params;
+      const { track_id } = req.body;
+      await TemplateModel.setDefaultMusic(uuid, track_id ?? null);
+      return res.json(success(null, "Đã cập nhật nhạc mặc định"));
     } catch (err) {
       next(err);
     }
