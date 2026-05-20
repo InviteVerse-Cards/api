@@ -13,6 +13,7 @@ export interface TemplateRow {
   thumbnail_url: string | null
   plan_required: 'free' | 'pro'
   use_count: number
+  sort_order: number
   is_active: number
   default_config: string
   theme_config: string | null
@@ -88,7 +89,7 @@ export const TemplateModel = {
        FROM templates t
        JOIN template_categories tc ON t.category_id = tc.id
        ${where}
-       ORDER BY t.plan_required ASC, t.use_count DESC`,
+       ORDER BY t.sort_order ASC, t.plan_required ASC, t.use_count DESC`,
       params
     )
     return rows
@@ -99,9 +100,18 @@ export const TemplateModel = {
       `SELECT t.*, tc.slug as category_slug
        FROM templates t
        JOIN template_categories tc ON t.category_id = tc.id
-       ORDER BY t.is_active DESC, t.plan_required ASC, t.use_count DESC`
+       ORDER BY tc.sort_order ASC, t.sort_order ASC, t.is_active DESC`
     )
     return rows
+  },
+
+  async reorderCategory(items: { uuid: string; sort_order: number }[]): Promise<void> {
+    for (const item of items) {
+      await pool.query(
+        'UPDATE templates SET sort_order = ?, updated_at = NOW() WHERE uuid = ?',
+        [item.sort_order, item.uuid]
+      )
+    }
   },
 
   async findById(id: number): Promise<TemplateRow | null> {

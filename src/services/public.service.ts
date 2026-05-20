@@ -65,6 +65,23 @@ export const PublicService = {
     return rows
   },
 
+  async getWishes(slug: string) {
+    const invitation = await InvitationModel.findBySlug(slug)
+    if (!invitation || invitation.status !== 'published') {
+      throw new AppError('NOT_FOUND', 'Thiệp không tồn tại', 404)
+    }
+
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT name, rsvp_note, rsvp_at
+       FROM guests
+       WHERE invitation_id = ? AND rsvp_note IS NOT NULL AND rsvp_note != ''
+       ORDER BY rsvp_at DESC
+       LIMIT 50`,
+      [invitation.id]
+    )
+    return rows
+  },
+
   async getMusicTracks() {
     const [rows] = await pool.query<RowDataPacket[]>(
       'SELECT id, name, url FROM music_tracks WHERE is_active = 1 ORDER BY id ASC'
