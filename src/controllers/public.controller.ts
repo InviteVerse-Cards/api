@@ -53,6 +53,14 @@ export const PublicController = {
     } catch (err) { next(err) }
   },
 
+  async getWishes(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { slug } = req.params
+      const wishes = await PublicService.getWishes(slug)
+      return res.json(success(wishes))
+    } catch (err) { next(err) }
+  },
+
   async getDefaultMusicTrack(_req: Request, res: Response, next: NextFunction) {
     try {
       const track = await MusicModel.findDefault()

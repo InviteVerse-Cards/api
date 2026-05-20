@@ -5,6 +5,7 @@ const router = Router()
 
 router.get('/', AdminTemplateController.list)
 router.post('/', AdminTemplateController.create)
+router.put('/reorder', AdminTemplateController.reorder)
 router.get('/:uuid/full', AdminTemplateController.getFull)
 router.put('/:uuid', AdminTemplateController.update)
 router.put('/:uuid/theme', AdminTemplateController.updateTheme)

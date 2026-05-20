@@ -137,4 +137,17 @@ export const AdminTemplateController = {
       next(err);
     }
   },
+
+  reorder: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const items = req.body as { uuid: string; sort_order: number }[]
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'items is required' } })
+      }
+      await TemplateModel.reorderCategory(items)
+      return res.json(success(null, 'Đã cập nhật thứ tự template'))
+    } catch (err) {
+      next(err)
+    }
+  },
 };
