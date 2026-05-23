@@ -13,7 +13,7 @@ function createTransport() {
   })
 }
 
-const FROM = process.env.EMAIL_FROM ?? 'Phong Thuỷ Tâm Đức <noreply@phongthuytamduc.vn>'
+const FROM = process.env.EMAIL_FROM ?? 'Tạo Thiệp Online <noreply@taothieponline.com>'
 const APP_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173'
 
 function buildEmailHtml(opts: {
@@ -78,10 +78,10 @@ function buildEmailHtml(opts: {
               <!-- Brand name -->
               <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;
                           font-weight:700;color:#f5c842;letter-spacing:1.5px;margin-bottom:4px;">
-                Phong Thuỷ Tâm Đức
+                Tạo Thiệp Online
               </div>
               <div style="font-size:11px;color:#6b6490;letter-spacing:3px;text-transform:uppercase;">
-                Thiên Cơ · Tâm Đức · Huyền Mệnh
+                Tạo Thiệp Online
               </div>
             </td>
           </tr>
@@ -181,11 +181,11 @@ function buildEmailHtml(opts: {
                 style="background-color:#0a0a14;padding:24px 48px;
                        border-top:1px solid rgba(255,255,255,0.05);">
               <p style="margin:0 0 6px;color:#4b4870;font-size:12px;text-align:center;line-height:1.6;">
-                Email này được gửi tự động từ hệ thống <strong style="color:#6b6490;">Phong Thuỷ Tâm Đức</strong>.<br/>
+                Email này được gửi tự động từ hệ thống <strong style="color:#6b6490;">Tạo Thiệp Online</strong>.<br/>
                 Vui lòng không trả lời email này.
               </p>
               <p style="margin:8px 0 0;color:#352f58;font-size:11px;text-align:center;">
-                &copy; ${new Date().getFullYear()} Phong Thuỷ Tâm Đức. Mọi quyền được bảo lưu.
+                &copy; ${new Date().getFullYear()} Tạo Thiệp Online. Mọi quyền được bảo lưu.
               </p>
             </td>
           </tr>
@@ -204,12 +204,12 @@ export const EmailService = {
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     const link = `${APP_URL}/verify-email?token=${token}`
     const html = buildEmailHtml({
-      preheader: 'Xác nhận địa chỉ email để kích hoạt tài khoản Phong Thuỷ Tâm Đức của bạn',
+      preheader: 'Xác nhận địa chỉ email để kích hoạt tài khoản Tạo Thiệp Online của bạn',
       icon: '✉',
       title: 'Xác thực email của bạn',
       bodyLines: [
-        'Cảm ơn bạn đã đăng ký tài khoản <strong style="color:#f1f0ff;">Phong Thuỷ Tâm Đức</strong>.',
-        'Nhấn vào nút bên dưới để xác thực địa chỉ email và bắt đầu<br/>khám phá vận mệnh của bạn.',
+        'Cảm ơn bạn đã đăng ký tài khoản <strong style="color:#f1f0ff;">Tạo Thiệp Online</strong>.',
+        'Nhấn vào nút bên dưới để xác thực địa chỉ email và bắt đầu<br/>tạo những thiệp mời đẹp cho sự kiện của bạn.',
       ],
       ctaHref: link,
       ctaText: '✨ Xác thực tài khoản',
@@ -224,7 +224,7 @@ export const EmailService = {
       await createTransport().sendMail({
         from: FROM,
         to: email,
-        subject: '✨ Xác thực tài khoản Phong Thuỷ Tâm Đức',
+        subject: '✨ Xác thực tài khoản Tạo Thiệp Online',
         html,
       })
     } catch (err) {
@@ -236,7 +236,7 @@ export const EmailService = {
   async sendPasswordResetEmail(email: string, token: string): Promise<void> {
     const link = `${APP_URL}/reset-password?token=${token}`
     const html = buildEmailHtml({
-      preheader: 'Yêu cầu đặt lại mật khẩu tài khoản Phong Thuỷ Tâm Đức của bạn',
+      preheader: 'Yêu cầu đặt lại mật khẩu tài khoản Tạo Thiệp Online của bạn',
       icon: '🔐',
       title: 'Đặt lại mật khẩu',
       bodyLines: [
@@ -257,7 +257,7 @@ export const EmailService = {
       await createTransport().sendMail({
         from: FROM,
         to: email,
-        subject: '🔑 Đặt lại mật khẩu Phong Thuỷ Tâm Đức',
+        subject: '🔑 Đặt lại mật khẩu Tạo Thiệp Online',
         html,
       })
     } catch (err) {
