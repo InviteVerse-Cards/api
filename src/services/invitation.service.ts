@@ -27,10 +27,10 @@ export const InvitationService = {
     const user = userRows[0]
     if (!user) throw new AppError('NOT_FOUND', 'Người dùng không tồn tại', 404)
 
-    const count = await InvitationModel.countByUser(userId)
-    if (count >= FREE_PLAN_LIMIT) {
-      throw new AppError('PLAN_LIMIT', `Bạn đã đạt giới hạn ${FREE_PLAN_LIMIT} thiệp. Mua thêm credits để tạo thêm.`, 403)
-    }
+    // const count = await InvitationModel.countByUser(userId)
+    // if (count >= FREE_PLAN_LIMIT) {
+    //   throw new AppError('PLAN_LIMIT', `Bạn đã đạt giới hạn ${FREE_PLAN_LIMIT} thiệp. Mua thêm credits để tạo thêm.`, 403)
+    // }
 
     let themeConfig: Record<string, unknown> = { ...DEFAULT_THEME }
     let defaultSections: Array<{ section_type: string; sort_order: number; is_enabled: boolean; config: Record<string, unknown> }> = []
@@ -131,6 +131,7 @@ export const InvitationService = {
 
   async update(userId: number, uuid: string, body: {
     title?: string
+    template_id?: number
     theme_config?: Record<string, unknown>
     sections?: Array<{ section_type: string; sort_order: number; is_enabled: boolean; config: Record<string, unknown> }>
   }) {
@@ -139,10 +140,69 @@ export const InvitationService = {
     if (invitation.user_id !== userId) throw new AppError('FORBIDDEN', 'Không có quyền', 403)
 
     if (body.title) await InvitationModel.updateTitle(invitation.id, body.title)
-    if (body.theme_config) await InvitationModel.updateThemeConfig(invitation.id, body.theme_config)
-    if (body.sections) {
-      for (const section of body.sections) {
-        await InvitationModel.upsertSection(invitation.id, section)
+    
+    if (body.template_id) {
+      const template = await TemplateModel.findById(body.template_id)
+      if (!template) throw new AppError('NOT_FOUND', 'Template không tồn tại', 404)
+      
+      const fullTemplate = await TemplateModel._buildFullData(template)
+      const themeConfig = fullTemplate.theme_config_parsed
+      const defaultSections = fullTemplate.sections.map(s => ({
+        section_type: s.section_type,
+        sort_order: s.sort_order,
+        is_enabled: s.is_enabled,
+        config: s.config,
+      }))
+
+      if (fullTemplate.default_music_track) {
+        const musicIdx = defaultSections.findIndex(s => s.section_type === 'music')
+        if (musicIdx !== -1) {
+          defaultSections[musicIdx] = {
+            ...defaultSections[musicIdx],
+            config: {
+              ...defaultSections[musicIdx].config,
+              track_url: fullTemplate.default_music_track.url,
+              track_name: fullTemplate.default_music_track.name,
+            },
+          }
+        }
+      }
+
+      const conn = await pool.getConnection()
+      try {
+        await conn.beginTransaction()
+
+        await conn.query(
+          'UPDATE invitations SET template_id = ?, theme_config = ? WHERE id = ?',
+          [template.id, JSON.stringify(themeConfig), invitation.id]
+        )
+
+        await conn.query('DELETE FROM invitation_sections WHERE invitation_id = ?', [invitation.id])
+
+        if (defaultSections.length > 0) {
+          const values = defaultSections.map(s => [
+            invitation.id, s.section_type, s.sort_order, s.is_enabled ? 1 : 0, JSON.stringify(s.config ?? {}),
+          ])
+          await conn.query(
+            `INSERT INTO invitation_sections (invitation_id, section_type, sort_order, is_enabled, config) VALUES ?`,
+            [values]
+          )
+        }
+
+        await conn.commit()
+        TemplateModel.incrementUseCount(template.id).catch(() => {})
+      } catch (err) {
+        await conn.rollback()
+        throw err
+      } finally {
+        conn.release()
+      }
+    } else {
+      if (body.theme_config) await InvitationModel.updateThemeConfig(invitation.id, body.theme_config)
+      if (body.sections) {
+        for (const section of body.sections) {
+          await InvitationModel.upsertSection(invitation.id, section)
+        }
       }
     }
 
