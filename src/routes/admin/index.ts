@@ -9,6 +9,7 @@ import statsAdminRoutes from './stats.admin.routes'
 import templateAdminRoutes from './template.admin.routes'
 import categoryAdminRoutes from './category.admin.routes'
 import musicAdminRoutes from './music.admin.routes'
+import invitationAdminRoutes from './invitation.admin.routes'
 
 const router = Router()
 
@@ -23,5 +24,6 @@ router.use('/stats', statsAdminRoutes)
 router.use('/templates', templateAdminRoutes)
 router.use('/categories', categoryAdminRoutes)
 router.use('/music', musicAdminRoutes)
+router.use('/invitations', invitationAdminRoutes)
 
 export default router
