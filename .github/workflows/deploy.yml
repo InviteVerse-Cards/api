@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Deploy via SSH
-      	# Pin version to v1 to avoid warnings
+        # Pin version to v1 to avoid warnings
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
