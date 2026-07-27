@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import pool from '@/config/database'
 import crypto from 'crypto'
+import { lookupIp } from '@/utils/geoip'
 
 const SESSION_COOKIE = 'iv_sid'
 const SESSION_MAX_AGE = 365 * 24 * 60 * 60 * 1000
@@ -35,6 +36,7 @@ export const HeartbeatController = {
       }
 
       const ip = getIp(req)
+      const { country, city } = lookupIp(ip)
       const sessionId = resolveSession(req, res)
       const userId: number | null = (req.user as { id: number } | undefined)?.id ?? null
       const page = typeof req.body?.page === 'string' ? req.body.page.slice(0, 128) : null
@@ -42,10 +44,10 @@ export const HeartbeatController = {
       res.status(200).json({ success: true })
 
       await pool.query(
-        `INSERT INTO online_heartbeats (session_id, user_id, page, ip_address, last_seen)
-         VALUES (?, ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE last_seen = NOW(), user_id = ?, page = ?`,
-        [sessionId, userId, page, ip, userId, page]
+        `INSERT INTO online_heartbeats (session_id, user_id, page, ip_address, country, city, last_seen)
+         VALUES (?, ?, ?, ?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE last_seen = NOW(), user_id = ?, page = ?, country = COALESCE(?, country), city = COALESCE(?, city)`,
+        [sessionId, userId, page, ip, country, city, userId, page, country, city]
       )
     } catch (err) {
       console.error('Lỗi heartbeat:', err)

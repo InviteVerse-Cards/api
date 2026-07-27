@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import pool from '@/config/database'
 import crypto from 'crypto'
+import { lookupIp } from '@/utils/geoip'
 
 const SESSION_COOKIE = 'iv_sid'
 const SESSION_MAX_AGE = 365 * 24 * 60 * 60 * 1000 // 1 year
@@ -44,6 +45,7 @@ export const TrackController = {
       }
 
       const ip = getIp(req)
+      const { country, city } = lookupIp(ip)
       const sessionId = resolveSession(req, res)
       const userId: number | null = (req.user as { id: number } | undefined)?.id ?? null
 
@@ -54,9 +56,9 @@ export const TrackController = {
         const safeReferrer = referrer ? referrer.slice(0, 512) : null
         const safeUa = ua ? ua.slice(0, 512) : null
         await pool.query(
-          `INSERT INTO page_view_logs (session_id, user_id, page, referrer, user_agent, ip_address)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [sessionId, userId, safePage, safeReferrer, safeUa, ip]
+          `INSERT INTO page_view_logs (session_id, user_id, page, referrer, user_agent, ip_address, country, city)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [sessionId, userId, safePage, safeReferrer, safeUa, ip, country, city]
         )
         return
       }

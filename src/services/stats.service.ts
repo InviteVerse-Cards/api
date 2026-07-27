@@ -260,5 +260,48 @@ export const StatsService = {
         (SELECT COUNT(*) FROM credit_orders WHERE status = 'paid')   AS paid_orders
     `)
     return stats
+  },
+
+  async getGeographicStats() {
+    interface GeoCityRow extends RowDataPacket {
+      city: string
+      country: string
+      visits: number
+      unique_visitors: number
+    }
+
+    const [cities] = await pool.query<GeoCityRow[]>(`
+      SELECT
+        COALESCE(city, 'Chưa xác định') as city,
+        COALESCE(country, 'VN') as country,
+        COUNT(*) as visits,
+        COUNT(DISTINCT session_id) as unique_visitors
+      FROM page_view_logs
+      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      GROUP BY city, country
+      ORDER BY visits DESC
+      LIMIT 15
+    `)
+
+    interface GeoCountryRow extends RowDataPacket {
+      country: string
+      visits: number
+    }
+
+    const [countries] = await pool.query<GeoCountryRow[]>(`
+      SELECT
+        COALESCE(country, 'Khác') as country,
+        COUNT(*) as visits
+      FROM page_view_logs
+      WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      GROUP BY country
+      ORDER BY visits DESC
+      LIMIT 10
+    `)
+
+    return {
+      cities,
+      countries
+    }
   }
 }
