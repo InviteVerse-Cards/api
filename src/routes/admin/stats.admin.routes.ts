@@ -9,6 +9,7 @@ router.get('/hourly-traffic', AdminStatsController.getHourlyTraffic)
 router.get('/popular-templates', AdminStatsController.getPopularTemplates)
 router.get('/cards-by-category', AdminStatsController.getCardsByCategory)
 router.get('/online-users', AdminStatsController.getOnlineUsers)
+router.get('/geographic', AdminStatsController.getGeographicStats)
 router.get('/revenue', AdminStatsController.getRevenue)
 router.get('/', AdminStatsController.getLegacyStats)
 

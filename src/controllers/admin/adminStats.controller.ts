@@ -73,5 +73,14 @@ export const AdminStatsController = {
     } catch (err) {
       next(err)
     }
+  },
+
+  getGeographicStats: async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await StatsService.getGeographicStats()
+      return res.json(success(data))
+    } catch (err) {
+      next(err)
+    }
   }
 }
