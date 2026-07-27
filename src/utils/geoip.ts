@@ -7,7 +7,10 @@ export interface GeoLocation {
 
 const LOCAL_IPS = new Set(['127.0.0.1', '::1', 'localhost'])
 
-export function lookupIp(ip: string | null | undefined): GeoLocation {
+// In-memory cache for IP lookup to avoid redundant external API calls
+const ipCache = new Map<string, GeoLocation>()
+
+export async function lookupIp(ip: string | null | undefined): Promise<GeoLocation> {
   if (!ip) {
     return { country: null, city: null }
   }
@@ -19,13 +22,44 @@ export function lookupIp(ip: string | null | undefined): GeoLocation {
     return { country: 'VN', city: 'Môi trường Local (Dev)' }
   }
 
-  const geo = geoip.lookup(cleanIp)
-  if (!geo) {
-    return { country: null, city: null }
+  // Check cache first
+  if (ipCache.has(cleanIp)) {
+    return ipCache.get(cleanIp)!
   }
 
-  return {
-    country: geo.country || null,
-    city: geo.city || null,
+  try {
+    // Query ip-api.com for accurate location (especially for Vietnam ISPs like Viettel, VNPT, FPT)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 2000)
+
+    const res = await fetch(`http://ip-api.com/json/${cleanIp}?fields=status,countryCode,city`, {
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+
+    if (res.ok) {
+      const data = (await res.json()) as { status: string; countryCode?: string; city?: string }
+      if (data.status === 'success') {
+        const result: GeoLocation = {
+          country: data.countryCode || 'VN',
+          city: data.city || null,
+        }
+        ipCache.set(cleanIp, result)
+        return result
+      }
+    }
+  } catch {
+    // Silent fallback to offline geoip-lite if API is unreachable or times out
   }
+
+  // Fallback to offline geoip-lite
+  const geo = geoip.lookup(cleanIp)
+  const fallbackResult: GeoLocation = {
+    country: geo?.country || null,
+    city: geo?.city || null,
+  }
+  if (fallbackResult.city) {
+    ipCache.set(cleanIp, fallbackResult)
+  }
+  return fallbackResult
 }

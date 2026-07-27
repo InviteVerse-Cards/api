@@ -82,5 +82,29 @@ export const AdminStatsController = {
     } catch (err) {
       next(err)
     }
+  },
+
+  getIpLogs: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { page, limit, q } = req.query
+      const data = await StatsService.getIpLogs({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        q: q ? String(q) : undefined,
+      })
+      return res.json(success(data))
+    } catch (err) {
+      next(err)
+    }
+  },
+
+  cleanupLogs: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const days = Number(req.body?.days) || 30
+      const data = await StatsService.cleanupTrafficLogs(days)
+      return res.json(success(data, `Đã dọn dẹp ${data.deleted_page_views + data.deleted_feature_events} bản ghi log cũ hơn ${data.days_retained} ngày.`))
+    } catch (err) {
+      next(err)
+    }
   }
 }
