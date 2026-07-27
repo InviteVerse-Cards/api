@@ -1,5 +1,5 @@
 import pool from '@/config/database'
-import type { RowDataPacket } from 'mysql2'
+import type { RowDataPacket, ResultSetHeader } from 'mysql2'
 
 export const StatsService = {
   async getOverview() {
@@ -302,6 +302,89 @@ export const StatsService = {
     return {
       cities,
       countries
+    }
+  },
+
+  async getIpLogs(params: { page?: number; limit?: number; q?: string }) {
+    const page = Math.max(1, Number(params.page) || 1)
+    const limit = Math.min(100, Math.max(1, Number(params.limit) || 15))
+    const offset = (page - 1) * limit
+    const search = params.q ? `%${params.q.trim()}%` : null
+
+    let whereClause = ''
+    const queryParams: any[] = []
+
+    if (search) {
+      whereClause = `WHERE (l.ip_address LIKE ? OR l.city LIKE ? OR u.email LIKE ? OR u.full_name LIKE ?)`
+      queryParams.push(search, search, search, search)
+    }
+
+    interface CountRow extends RowDataPacket {
+      total: number
+    }
+    const [[countResult]] = await pool.query<CountRow[]>(
+      `SELECT COUNT(DISTINCT l.ip_address) as total
+       FROM page_view_logs l
+       LEFT JOIN users u ON l.user_id = u.id
+       ${whereClause}`,
+      queryParams
+    )
+    const total = countResult?.total ?? 0
+
+    interface IpLogRow extends RowDataPacket {
+      ip_address: string
+      city: string | null
+      country: string | null
+      total_views: number
+      last_active: Date
+      users_associated: string | null
+    }
+
+    const [rows] = await pool.query<IpLogRow[]>(
+      `SELECT
+         l.ip_address,
+         MAX(l.city) as city,
+         MAX(l.country) as country,
+         COUNT(l.id) as total_views,
+         MAX(l.created_at) as last_active,
+         GROUP_CONCAT(DISTINCT CONCAT(COALESCE(u.full_name, 'Khách'), ' (', COALESCE(u.email, 'Ẩn danh'), ')') SEPARATOR ', ') as users_associated
+       FROM page_view_logs l
+       LEFT JOIN users u ON l.user_id = u.id
+       ${whereClause}
+       GROUP BY l.ip_address
+       ORDER BY total_views DESC, last_active DESC
+       LIMIT ? OFFSET ?`,
+      [...queryParams, limit, offset]
+    )
+
+    return {
+      data: rows,
+      meta: {
+        page,
+        limit,
+        total,
+        total_pages: Math.ceil(total / limit)
+      }
+    }
+  },
+
+  async cleanupTrafficLogs(days: number) {
+    const safeDays = Math.max(7, Math.min(365, Number(days) || 30))
+
+    const [resPv] = await pool.query<ResultSetHeader>(
+      `DELETE FROM page_view_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`,
+      [safeDays]
+    )
+
+    const [resFe] = await pool.query<ResultSetHeader>(
+      `DELETE FROM feature_events WHERE created_at < DATE_SUB(NOW(), INTERVAL ? DAY)`,
+      [safeDays]
+    )
+
+    return {
+      deleted_page_views: resPv.affectedRows ?? 0,
+      deleted_feature_events: resFe.affectedRows ?? 0,
+      days_retained: safeDays
     }
   }
 }

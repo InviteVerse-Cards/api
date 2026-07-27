@@ -9,6 +9,16 @@ const SESSION_MAX_AGE = 365 * 24 * 60 * 60 * 1000 // 1 year
 const BOT_PATTERN = /bot|crawler|spider|slurp|baiduspider|bingbot|googlebot|yandex|facebookexternalhit|wget|curl/i
 
 function getIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for']
+  if (forwarded) {
+    const raw = typeof forwarded === 'string' ? forwarded : forwarded[0]
+    const clientIp = raw.split(',')[0].trim()
+    if (clientIp) return clientIp.replace(/^::ffff:/, '')
+  }
+  const realIp = req.headers['x-real-ip']
+  if (realIp && typeof realIp === 'string') {
+    return realIp.trim().replace(/^::ffff:/, '')
+  }
   const raw = req.ip ?? req.socket.remoteAddress ?? 'unknown'
   return raw === '::1' ? '127.0.0.1' : raw.replace(/^::ffff:/, '')
 }
@@ -45,7 +55,7 @@ export const TrackController = {
       }
 
       const ip = getIp(req)
-      const { country, city } = lookupIp(ip)
+      const { country, city } = await lookupIp(ip)
       const sessionId = resolveSession(req, res)
       const userId: number | null = (req.user as { id: number } | undefined)?.id ?? null
 

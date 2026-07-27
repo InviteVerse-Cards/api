@@ -10,6 +10,8 @@ router.get('/popular-templates', AdminStatsController.getPopularTemplates)
 router.get('/cards-by-category', AdminStatsController.getCardsByCategory)
 router.get('/online-users', AdminStatsController.getOnlineUsers)
 router.get('/geographic', AdminStatsController.getGeographicStats)
+router.get('/ip-logs', AdminStatsController.getIpLogs)
+router.post('/cleanup-logs', AdminStatsController.cleanupLogs)
 router.get('/revenue', AdminStatsController.getRevenue)
 router.get('/', AdminStatsController.getLegacyStats)
 
