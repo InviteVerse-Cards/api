@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise'
+import type { PoolConnection as CallbackPoolConnection } from 'mysql2'
 import { logger } from '@/utils/logger'
 
 const pool = mysql.createPool({
@@ -10,8 +11,17 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
-  timezone: '+07:00',
+  timezone: 'Z',
   dateStrings: false,
+})
+
+pool.on('connection', connection => {
+  const callbackConnection = connection as unknown as CallbackPoolConnection
+  callbackConnection.query("SET SESSION time_zone = '+00:00'", err => {
+    if (err) {
+      logger.error('Failed to set MySQL session timezone to UTC:', err)
+    }
+  })
 })
 
 pool.getConnection()
