@@ -352,7 +352,7 @@ export const StatsService = {
        LEFT JOIN users u ON l.user_id = u.id
        ${whereClause}
        GROUP BY l.ip_address
-       ORDER BY total_views DESC, last_active DESC
+       ORDER BY last_active DESC
        LIMIT ? OFFSET ?`,
       [...queryParams, limit, offset]
     )
